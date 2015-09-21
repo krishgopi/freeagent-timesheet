@@ -6,7 +6,8 @@ function onOpen() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var menuEntries = [ {name: "Update TimeSheets", functionName: "freeagentEntryPoint"}];
   ss.addMenu("Veda", menuEntries);
-   
+  //clear the saved access_token when open document
+  UserProperties.deleteProperty(tokenPropertyName);   
 }
 
 
@@ -36,8 +37,6 @@ function freeagentEntryPoint(){
     var authInfo = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
     status = authInfo.getAuthorizationStatus();
     url = authInfo.getAuthorizationUrl();
-    //adddatatosheet(status);
-    //adddatatosheet(url);
     getData();
     //tabsData();
     //HTMLToOutput += uploadData();
@@ -77,7 +76,9 @@ function runSOQL(soql){
   var sheets = ss.getSheets();
   var sheet = ss.getActiveSheet();  
   
-   var defaultSheet = sheets[0];
+  var defaultSheet = sheets[0];
+
+  defaultSheet.clear({contentsOnly: true});
   
   // Push Veda Consulting into the contacts Array
   processContactArray.push(['Veda Consulting']);
@@ -131,7 +132,8 @@ function runSOQL(soql){
  
     totalArray = totalArray.concat(timeslipsArray[v]);
 
-  }  
+  }
+  adddatatosheet(totalArray.length + ' timeslips found');  
   Logger.log("total length" + totalArray.length)  ;
 
   for (c = 0; c < processContactArray.length; c++){
@@ -252,6 +254,7 @@ function createFiles(orgName, rows, orgRows, titles){
      }
   }
   if (!getFolder) {
+    adddatatosheet('folder not found! creating one... ');
     var folder   = DriveApp.createFolder('Veda Timesheets');
     var folderId = folder.getId();
   }
@@ -269,6 +272,7 @@ function createFiles(orgName, rows, orgRows, titles){
   }
   
   if (!getFile) {
+    adddatatosheet('creating spreadsheet for ', orgName);
     var ssNew = SpreadsheetApp.create(orgName);
     var spreadFile = DriveApp.getFileById(ssNew.getId());
     DriveApp.getFolderById(folderId).addFile(spreadFile);    
@@ -307,6 +311,7 @@ function createFiles(orgName, rows, orgRows, titles){
   textFormat(sheet, titleRange);
   
   if(orgName == 'Veda Consulting'){
+    adddatatosheet('Updating ', 'Veda Spreadsheet');
     dataRange = sheet.getRange(2, 1, rows.length, 12);
     dataRange.setValues(rows);
     //styling the data
@@ -319,6 +324,7 @@ function createFiles(orgName, rows, orgRows, titles){
     tabsData(defaultSheet, userHourSheet, taskHourSheet, clientHourSheet, colorme);
   }
   else{
+    adddatatosheet('Updating ', orgName);
     dataRange = sheet.getRange(2, 1, orgRows.length, 12);
     dataRange.setValues(orgRows);
     //styling the data
@@ -443,6 +449,7 @@ function tabsData(defaultSheet, userHourSheet, taskHourSheet, clientHourSheet, c
 
 
 function userHours(defaultSheet, userHourSheet, colorme) {
+  adddatatosheet('Updating User Tab ');
   
   // Get range to print week number 
   var getWeekRange = userHourSheet.getRange("A2:A"+numRow);
@@ -524,6 +531,7 @@ function userHours(defaultSheet, userHourSheet, colorme) {
 
 
 function taskHours( taskHourSheet) {
+  adddatatosheet('Updating Task Tab ');
   
   // Get range to print week number 
   var getWeekRange = taskHourSheet.getRange("A2:A"+numRow);
@@ -604,6 +612,7 @@ function taskHours( taskHourSheet) {
 
 
 function clientHours(clientHourSheet) {
+  adddatatosheet('Updating Client Tab ');
   
   // Get range to print week number 
   var getWeekRange = clientHourSheet.getRange("A2:A"+numRow);
@@ -733,10 +742,26 @@ function getAndStoreAccessToken(code){
   var response = UrlFetchApp.fetch(nextURL, getUrlFetchPOSTAuthOptions(payload)).getContentText();   
   var tokenResponse = JSON.parse(response);
 
+  ///store the refresh_token for later retrieval
+  UserProperties.setProperty(refreshTokenPropertyName, tokenResponse.refresh_token);
   //freeagent requires you to call against the instance URL that is against the token (eg. https://dev.freeagent.com/)
   UserProperties.setProperty(baseURLPropertyName, tokenResponse.instance_url);
-  //store the token for later retrival
-  UserProperties.setProperty(tokenPropertyName, tokenResponse.access_token);
+}
+
+// get and store access_token using the refresh_token
+function refreshAccessToken(){
+  adddatatosheet('refreshing access_token');
+  var refresh_token = UserProperties.getProperty(refreshTokenPropertyName);
+  if(!refresh_token){
+    return
+  }
+  var tokenURL = TOKEN_URL;
+  var payload = 'grant_type=refresh_token&refresh_token='+refresh_token;
+  
+  var refresh = UrlFetchApp.fetch(tokenURL, getUrlFetchPOSTAuthOptions(payload)).getContentText();
+  var refreshResponse = JSON.parse(refresh);
+  UserProperties.setProperty(tokenPropertyName, refreshResponse.access_token);
+  return refreshResponse.access_token;
 }
 
 
@@ -778,9 +803,11 @@ function getUrlFetchPOSTOptions(payload){
 
 function isTokenValid() {
   var token = UserProperties.getProperty(tokenPropertyName);
-  //adddatatosheet(token, 'token');
   if(!token){ //if its empty or undefined
-    return false;
+    var token = refreshAccessToken(); // get token from refresh token
+    if(!token){ // if refresh token is not set return false
+       return false;
+    }
   }
   return true; //naive check
 }

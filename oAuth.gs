@@ -14,6 +14,7 @@ var REDIRECT_URL= ScriptApp.getService().getUrl();
 //this is the user propety where we'll store the token, make sure this is unique across all user properties across all scripts
 var tokenPropertyName = 'FREEAGENT_OAUTH_TOKEN5'; 
 var baseURLPropertyName = 'FREEAGENT_INSTANCE_URL5';
+var refreshTokenPropertyName = 'FREEAGENT_REFRESH_TOKEN5';
 
 var apiurl = 'https://api.sandbox.freeagent.com/v2/';
 var perpage = 100;  // max 100
