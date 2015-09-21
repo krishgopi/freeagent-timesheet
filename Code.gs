@@ -131,7 +131,6 @@ function runSOQL(soql){
    // Browser.msgBox("Number of timeslips in page "+pageNo+" = "+timeslipsArray[v].length)
  
     totalArray = totalArray.concat(timeslipsArray[v]);
-
   }
   adddatatosheet(totalArray.length + ' timeslips found');  
   Logger.log("total length" + totalArray.length)  ;
